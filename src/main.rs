@@ -1,7 +1,7 @@
 mod dom;
 mod parser;
 
-use parser::Html;
+use parser::html::Html;
 use std::fs;
 
 fn main() {
