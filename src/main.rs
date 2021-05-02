@@ -1,12 +1,12 @@
 mod dom;
 mod parser;
 
-use parser::Parser;
+use parser::Html;
 use std::fs;
 
 fn main() {
-    let html = fs::read_to_string("test.html").unwrap();
+    let document = fs::read_to_string("test.html").unwrap();
 
-    let dom_root = Parser::parse(html);
+    let dom_root = Html::parse(document);
     println!("{:#?}", dom_root);
 }

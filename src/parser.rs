@@ -2,12 +2,12 @@ use std::usize;
 
 use crate::dom::{AttrMap, Node};
 
-pub struct Parser {
+pub struct Html {
     pos: usize,
     input: String,
 }
 
-impl Parser {
+impl Html {
     /// Read the current character with out consuming it
     fn next_char(&self) -> char {
         self.input.get(self.pos..).unwrap().chars().next().unwrap()
@@ -54,10 +54,16 @@ impl Parser {
         })
     }
 
-    fn parse_node(&mut self) -> Node {
+    fn parse_node(&mut self) -> Option<Node> {
+        if self.starts_with("<!--") {
+            self.parse_comment();
+            return None;
+        } else if self.starts_with("</") {
+            return None;
+        }
         match self.next_char() {
-            '<' => self.parse_element(),
-            _ => self.parse_text(),
+            '<' => Some(self.parse_element()),
+            _ => Some(self.parse_text()),
         }
     }
 
@@ -151,14 +157,17 @@ impl Parser {
             } else if self.eof() || self.starts_with("</") {
                 break;
             }
-            nodes.push(self.parse_node());
+            match self.parse_node() {
+                Some(node) => nodes.push(node),
+                None => continue,
+            }
         }
         nodes
     }
 
     /// Parse an html document and return the root node
     pub fn parse(source: String) -> Node {
-        let mut nodes = Parser {
+        let mut nodes = Html {
             pos: 0,
             input: source,
         }
@@ -180,7 +189,7 @@ mod tests {
     #[test]
     fn test_parse() {
         let html = "<h1>Hello, <i>world!</i></h1>".to_string();
-        let test_dom = Parser::parse(html);
+        let test_dom = Html::parse(html);
 
         // ensure the root node has the correct number of children
         assert!(test_dom.children().len() == 2);
@@ -217,7 +226,7 @@ mod tests {
     #[test]
     fn test_parse_comment_text() {
         let html = "<h1>Hello <!-- this is a comment --> world</h1>".to_string();
-        let root = Parser::parse(html);
+        let root = Html::parse(html);
 
         // Ensure the root node only has one child, the text within h1 tags
         assert!(root.children().len() == 1);
@@ -225,5 +234,17 @@ mod tests {
         // Ensure the text only contains the full text with comment removed
         let child = root.children().get(0).unwrap();
         assert!(&child.get_text().unwrap() == "Hello  world");
+    }
+
+    #[test]
+    fn test_parse_comment_node() {
+        let html = "<h1><!-- comment --></h1>".to_string();
+        let root = Html::parse(html);
+
+        // assert that only one node was parsed
+        assert!(root.children().is_empty());
+
+        // assert the h1 tag is parsed properly
+        assert!(&root.get_tag().unwrap() == "h1");
     }
 }
