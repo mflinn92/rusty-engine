@@ -10,6 +10,7 @@ struct Rule {
     declarations: Vec<Declaration>,
 }
 
+#[derive(Debug)]
 /// css seletor used to select dom nodes to apply styles to.
 enum Selector {
     /// Can be a tag name, id prefixed with # or class prefixed with .
@@ -17,6 +18,20 @@ enum Selector {
     Simple(SimpleSelector),
 }
 
+/// Used to decide which style applies in a conflict
+pub type Specificity = (usize, usize, usize);
+
+impl Selector {
+    pub fn specificity(&self) -> Specificity {
+        let Selector::Simple(ref simple) = *self;
+        let a = simple.id.iter().count();
+        let b = simple.class.len();
+        let c = simple.tag_name.iter().count();
+        (a, b, c)
+    }
+}
+
+#[derive(Debug)]
 struct SimpleSelector {
     tag_name: Option<String>,
     id: Option<String>,
@@ -129,6 +144,33 @@ impl Css {
     fn parse_identifier(&mut self) -> String {
         self.consume_while(valid_identifier_char)
     }
+
+    // fn parse_rule(&mut self) -> Rule {
+    //     Rule {
+    //         selectors: self.parse_selectors(),
+    //         declarations: self.parse_declarations(),
+    //     }
+    // }
+
+    /// Parse comma separated list of selectors
+    fn parse_selectors(&mut self) -> Vec<Selector> {
+        let mut selectors = Vec::new();
+        loop {
+            selectors.push(Selector::Simple(self.parse_simple_selector()));
+            self.consume_whitespace();
+            match self.next_char() {
+                ',' => {
+                    self.consume_char();
+                    self.consume_whitespace();
+                }
+                '{' => break, // start of declarations
+                c => panic!("Unexpected character: {} in selector list", c),
+            }
+        }
+        selectors.sort_by(|a, b| b.specificity().cmp(&a.specificity()));
+        println!("{:#?}", selectors);
+        selectors
+    }
 }
 
 fn valid_identifier_char(c: char) -> bool {
@@ -172,5 +214,39 @@ mod tests {
         assert!(selector.class.len() == 1);
         let class = selector.class.get(0);
         assert!(class.unwrap() == "test_class");
+    }
+
+    #[test]
+    fn test_multiple_selector() {
+        let mut css = Css {
+            pos: 0,
+            input: String::from("#test_id, p, .test_class1, .test_class2 {}"),
+        };
+        let selectors = css.parse_selectors();
+
+        // test 1st selector
+        match selectors.get(0).unwrap() {
+            Selector::Simple(s1) => {
+                assert!(s1.id.as_ref().unwrap() == "test_id");
+            }
+        }
+        // test 2nd selector
+        match selectors.get(1).unwrap() {
+            Selector::Simple(s2) => {
+                assert!(s2.class.get(0).unwrap() == "test_class1");
+            }
+        }
+        // test 3rd selector
+        match selectors.get(2).unwrap() {
+            Selector::Simple(s3) => {
+                assert!(s3.class.get(0).unwrap() == "test_class2");
+            }
+        }
+        // test 4th selector
+        match selectors.get(3).unwrap() {
+            Selector::Simple(s4) => {
+                assert!(s4.tag_name.as_ref().unwrap() == "p");
+            }
+        }
     }
 }
