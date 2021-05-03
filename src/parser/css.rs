@@ -168,7 +168,6 @@ impl Css {
             }
         }
         selectors.sort_by(|a, b| b.specificity().cmp(&a.specificity()));
-        println!("{:#?}", selectors);
         selectors
     }
 }
